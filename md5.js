@@ -3,14 +3,64 @@
  *
  * Based off js implementation at http://www.myersdaily.org/joseph/javascript/md5-text.html
  *
- * To hash a string call window.jsMd5.hash("hello")
- * If you wish to "stream" data use window.jsMd5.init(), window.jsMd5.update() and window.jsMd5.finalize()
+ * To hash a string call StreamMD5.hash("hello")
+ * If you wish to "stream" data use state = StreamMD5.init(), StreamMD5.update(state, 'new') and StreamMD5.finalize(state)
  *    It closely relates to how php's hash_init works
  *
  * Modified by James Hartig <fastest963@gmail.com>
  */
 
 (function() {
+
+    var HAS_BUFFERS = (typeof 'Buffer' !== 'undefined'),
+        undefined;
+
+    if (HAS_BUFFERS) {
+        function bufferCharCodeAt(buf, offset) {
+            return buf.readUInt8(offset);
+        }
+        function bufferSubstring(buf, start, end) {
+            return buf.slice(start, end);
+        }
+        function bufferConcat(buf, buf2) {
+            if (buf === null) {
+                return buf2;
+            }
+            return Buffer.concat([buf, buf2]);
+        }
+    }
+
+    function stringCharCodeAt(string, offset) {
+        return string.charCodeAt(offset);
+    }
+    function stringSubstring(string, start, end) {
+        return string.substring(start, end);
+    }
+
+    function stringConcat(string, string2) {
+        if (string === null) {
+            return string2;
+        }
+        return string + string2;
+    }
+
+
+    function arrayCharCodeAt(array, offset) {
+        return array[offset];
+    }
+    function arrayStringCharCodeAt(array, offset) {
+        return array[offset].charCodeAt(0);
+    }
+    function arraySubstring(array, start, end) {
+        return array.slice(start, end);
+    }
+    function arrayConcat(array, array2) {
+        if (array === null) {
+            return array2;
+        }
+        return array.concat(array2);
+    }
+
     function md5cycle(x, k) {
         var a = x[0], b = x[1], c = x[2], d = x[3];
 
@@ -109,83 +159,109 @@
         return cmn(c ^ (b | (~d)), a, b, x, s, t);
     }
 
-    this.init = function() {
-        return [1732584193, -271733879, -1732584194, 271733878, 0, ""];
-    };
+    function init() {
+        return [1732584193, -271733879, -1732584194, 271733878, 0, null];
+    }
 
     //progressive md51
-    this.update = function(state, s) {
+    function update(state, s) {
+        var len = s.length,
+            substring, charCodeAt, concat;
+        if (HAS_BUFFERS && (s instanceof Buffer)) {
+            substring = bufferSubstring;
+            charCodeAt = bufferCharCodeAt;
+            concat = bufferConcat;
+        } else if (s instanceof Array) {
+            substring = arraySubstring;
+            if (typeof s[0] === 'string') {
+                charCodeAt = arrayStringCharCodeAt;
+            } else {
+                charCodeAt = arrayCharCodeAt;
+            }
+            concat = arrayConcat;
+        } else {
+            substring = stringSubstring;
+            charCodeAt = stringCharCodeAt;
+            concat = stringConcat;
+        }
         if (!state) {
-            state = this.init();
+            state = init();
         }
-        state[4] += s.length;
+        state[4] += len;
         //if we have trailing data
-        if (state[5] != "") {
-            s = state[5] + s;
-            state[5] = "";
+        if (state[5] !== null) {
+            s = concat(state[5], s);
+            state[5] = null;
+            len = s.length;
         }
-        for (var i=64; i<=s.length; i+=64) {
-            md5cycle(state, md5blk(s.substring(i-64, i)));
+        for (var i = 64; i <= len; i+=64) {
+            md5cycle(state, md5blk(substring(s, i-64, i), charCodeAt));
         }
-        state[5] += s.substring(i-64);
+        state[5] = concat(state[5], substring(s, i-64));
         return state;
-    };
+    }
 
-    this.finalize = function(state) {
-        var i, s = "", n = state[4];
+    function finalize(state) {
+        var n = state[4],
+            s = state[5],
+            i, l;
         //if we have trailing data
-        if (state[5] != "") {
+        if (s !== null && s.length >= 64) {
+            //clear out last buffer since we're sending it to update
+            state[5] = null;
+            state = update(state, s);
             s = state[5];
-            state[5] = "";
-            if (s.length >= 64) {
-                state = this.update(state, s);
+        }
+        //todo: clean this up somehow
+        var substring, charCodeAt;
+        if (HAS_BUFFERS && (s instanceof Buffer)) {
+            substring = bufferSubstring;
+            charCodeAt = bufferCharCodeAt;
+        } else if (s instanceof Array) {
+            substring = arraySubstring;
+            if (typeof s[0] === 'string') {
+                charCodeAt = arrayStringCharCodeAt;
+            } else {
+                charCodeAt = arrayCharCodeAt;
+            }
+        } else {
+            substring = stringSubstring;
+            charCodeAt = stringCharCodeAt;
+        }
+        var tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        if (s !== null) {
+            s = substring(s, -1 * (n % 64)); //get the difference at the end
+            for (i = 0, l = s.length; i < l; i++) {
+                tail[i >> 2] |= charCodeAt(s, i) << ((i % 4) << 3);
             }
         }
-
-        s = s.substr(-1 * (n % 64)); //get the difference at the end
-        var tail = [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0];
-        for (i=0; i<s.length; i++)
-            tail[i>>2] |= s.charCodeAt(i) << ((i%4) << 3);
         tail[i>>2] |= 0x80 << ((i%4) << 3);
         if (i > 55) {
             md5cycle(state, tail);
             for (i=0; i<16; i++) tail[i] = 0;
         }
-        tail[14] = n*8;
+        tail[14] = n * 8;
         md5cycle(state, tail);
 
         state.pop(); //get rid of the data count
         state.pop(); //get rid of the cache
         return hex(state);
-    };
-
-    function md51(s) {
-        var n = s.length,
-        state = [1732584193, -271733879, -1732584194, 271733878], i;
-        for (i=64; i<=s.length; i+=64) {
-            md5cycle(state, md5blk(s.substring(i-64, i)));
-        }
-        s = s.substring(i-64);
-        var tail = [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0];
-        for (i=0; i<s.length; i++)
-            tail[i>>2] |= s.charCodeAt(i) << ((i%4) << 3);
-        tail[i>>2] |= 0x80 << ((i%4) << 3);
-        if (i > 55) {
-            md5cycle(state, tail);
-            for (i=0; i<16; i++) tail[i] = 0;
-        }
-        tail[14] = n*8;
-        md5cycle(state, tail);
-        return state;
     }
 
-    function md5blk(s) { /* I figured global was faster.   */
+    function md51(s, substring, charCodeAt) {
+        var state = init();
+        state[4] = s.length;
+        state[5] = s;
+        return finalize(state);
+    }
+
+    function md5blk(s, charCodeAt) { /* I figured global was faster.   */
         var md5blks = [], i; /* Andy King said do it this way. */
         for (i=0; i<64; i+=4) {
-            md5blks[i>>2] = s.charCodeAt(i)
-            + (s.charCodeAt(i+1) << 8)
-            + (s.charCodeAt(i+2) << 16)
-            + (s.charCodeAt(i+3) << 24);
+            md5blks[i>>2] = charCodeAt(s, i)
+            + (charCodeAt(s, i+1) << 8)
+            + (charCodeAt(s, i+2) << 16)
+            + (charCodeAt(s, i+3) << 24);
         }
         return md5blks;
     }
@@ -210,7 +286,12 @@
         return (a + b) & 0xFFFFFFFF;
     }
 
-    if (hex(md51('hello')) != '5d41402abc4b2a76b9719d911017c592') {
+    function hash(s) {
+        return md51(s);
+    }
+
+    //detect if in older IE and fallback to stupid version of add32
+    if (hash('hello') != '5d41402abc4b2a76b9719d911017c592') {
         function add32(x, y) {
             var lsw = (x & 0xFFFF) + (y & 0xFFFF),
                 msw = (x >> 16) + (y >> 16) + (lsw >> 16);
@@ -218,9 +299,23 @@
         }
     }
 
-    this.hash = function(s) {
-        return hex(md51(s));
+    var StreamMD5 = {
+        init: init,
+        update: update,
+        finalize: finalize,
+        hash: hash
     };
 
-    window.jsMd5 = this;
-})();
+    if (typeof module !== "undefined") {
+        module.exports = StreamMD5;
+    } else {
+        window.StreamMD5 = StreamMD5;
+        window.jsMd5 = StreamMD5; //backwards-compatibility
+
+        if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
+            define('StreamMD5', function() {
+                return StreamMD5;
+            });
+        }
+    }
+}());
