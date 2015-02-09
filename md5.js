@@ -230,7 +230,6 @@
         }
         var tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         if (s !== null) {
-            s = substring(s, -1 * (n % 64)); //get the difference at the end
             for (i = 0, l = s.length; i < l; i++) {
                 tail[i >> 2] |= charCodeAt(s, i) << ((i % 4) << 3);
             }

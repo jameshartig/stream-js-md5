@@ -53,8 +53,10 @@ exports.helloStreaming = function(test) {
 };
 
 exports.mp3Buffer = function(test) {
-    var noiseFile = fs.readFileSync('tests/noise.mp3'),
-        hash = StreamMD5.hash(noiseFile);
-    test.equal(hash, '0377bc7d70c592cc73c5fb2af6af3d7b');
-    test.done();
+    fs.readFile('tests/noise.mp3', function(err, buffer) {
+        if (err) throw err;
+        test.ok((buffer instanceof Buffer));
+        test.equal(StreamMD5.hash(buffer), '0377bc7d70c592cc73c5fb2af6af3d7b');
+        test.done();
+    });
 };
