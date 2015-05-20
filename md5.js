@@ -30,6 +30,19 @@
         }
     }
 
+    function uint8ArraySubstring(uint8Array, start, end) {
+        return uint8Array.subarray(start, end);
+    }
+    function uint8ArrayConcat(uint8Array1, uint8Array2) {
+        if (uint8Array1 === null) {
+            return uint8Array2;
+        }
+        var tmp = new Uint8Array(uint8Array1.length + uint8Array2.length);
+        tmp.set(uint8Array1, 0);
+        tmp.set(uint8Array2, uint8Array1.length);
+        return tmp;
+    }
+
     function stringCharCodeAt(string, offset) {
         return string.charCodeAt(offset);
     }
@@ -179,6 +192,10 @@
                 charCodeAt = arrayCharCodeAt;
             }
             concat = arrayConcat;
+        } else if (s instanceof Uint8Array) {
+            substring = uint8ArraySubstring;
+            charCodeAt = arrayCharCodeAt;
+            concat = uint8ArrayConcat;
         } else {
             substring = stringSubstring;
             charCodeAt = stringCharCodeAt;
@@ -224,6 +241,9 @@
             } else {
                 charCodeAt = arrayCharCodeAt;
             }
+        } else if (s instanceof Uint8Array) {
+            substring = uint8ArraySubstring;
+            charCodeAt = arrayCharCodeAt;
         } else {
             substring = stringSubstring;
             charCodeAt = stringCharCodeAt;

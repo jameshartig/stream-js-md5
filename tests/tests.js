@@ -41,6 +41,12 @@ exports.helloBytesArray = function(test) {
     test.done();
 };
 
+exports.helloUint8Array = function(test) {
+    var hash = StreamMD5.hash(new Uint8Array([c('h'), c('e'), c('l'), c('l'), c('o')]));
+    test.equal(hash, '5d41402abc4b2a76b9719d911017c592');
+    test.done();
+};
+
 exports.helloStreaming = function(test) {
     var state = StreamMD5.init(),
         hash;
