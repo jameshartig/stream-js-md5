@@ -16,34 +16,30 @@
         HAS_UINT8ARRAY = (typeof Uint8Array !== 'undefined')
         undefined;
 
-    if (HAS_BUFFERS) {
-        function bufferCharCodeAt(buf, offset) {
-            return buf.readUInt8(offset);
+    function bufferCharCodeAt(buf, offset) {
+        return buf.readUInt8(offset);
+    }
+    function bufferSubstring(buf, start, end) {
+        return buf.slice(start, end);
+    }
+    function bufferConcat(buf, buf2) {
+        if (buf === null) {
+            return buf2;
         }
-        function bufferSubstring(buf, start, end) {
-            return buf.slice(start, end);
-        }
-        function bufferConcat(buf, buf2) {
-            if (buf === null) {
-                return buf2;
-            }
-            return Buffer.concat([buf, buf2]);
-        }
+        return Buffer.concat([buf, buf2]);
     }
 
-    if (HAS_UINT8ARRAY) {
-        function uint8ArraySubstring(uint8Array, start, end) {
-            return uint8Array.subarray(start, end);
+    function uint8ArraySubstring(uint8Array, start, end) {
+        return uint8Array.subarray(start, end);
+    }
+    function uint8ArrayConcat(uint8Array1, uint8Array2) {
+        if (uint8Array1 === null) {
+            return uint8Array2;
         }
-        function uint8ArrayConcat(uint8Array1, uint8Array2) {
-            if (uint8Array1 === null) {
-                return uint8Array2;
-            }
-            var tmp = new Uint8Array(uint8Array1.length + uint8Array2.length);
-            tmp.set(uint8Array1, 0);
-            tmp.set(uint8Array2, uint8Array1.length);
-            return tmp;
-        }
+        var tmp = new Uint8Array(uint8Array1.length + uint8Array2.length);
+        tmp.set(uint8Array1, 0);
+        tmp.set(uint8Array2, uint8Array1.length);
+        return tmp;
     }
 
     function stringCharCodeAt(string, offset) {
